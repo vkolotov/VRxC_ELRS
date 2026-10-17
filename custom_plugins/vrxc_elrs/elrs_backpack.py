@@ -387,6 +387,48 @@ class ELRSBackpack(VRxController):
         self.send_msp(packet)
 
     #
+    # VTX control
+    #
+
+    VTX_BANDS = "ABEFRL"
+    """
+    Band order the ELRS VTX administrator uses ("Disabled;A;B;E;F;R;L"), so A
+    is band 1 and the index on the wire is (band - 1) * 8 + (channel - 1).
+    """
+
+    def send_set_vtx_config(
+        self, band: str, channel: int, power: int = 0, pitmode: int = 0
+    ) -> None:
+        """
+        Sends a VTX configuration packet to the current recipient.
+
+        The timer backpack forwards any MSP function it does not recognise
+        verbatim over ESP-NOW, so this reaches the pilot's TX backpack, which
+        hands it to the handset's ELRS module, which sends the channel to the
+        receiver and on to the VTX.
+
+        The power and pit mode bytes are carried for completeness but the ELRS
+        module currently reads only the channel index from a backpack packet,
+        taking its power from its own configuration instead.
+
+        :param band: Band letter, one of A B E F R L
+        :param channel: Channel number, 1 to 8
+        :param power: Power index, 0 to leave unchanged
+        :param pitmode: Pit mode flag
+        """
+        band = band.upper()
+        if band not in self.VTX_BANDS or not 1 <= channel <= 8:
+            raise ValueError(f"Not a VTX channel: {band}{channel}")
+
+        index = self.VTX_BANDS.index(band) * 8 + (channel - 1)
+
+        packet = MSPPacket()
+        packet.set_function(MSPTypes.MSP_SET_VTX_CONFIG)
+        packet.set_payload(bytearray((index, 0, power, pitmode)))
+        logger.info("Setting VTX to %s%s (index %s)", band, channel, index)
+        self.send_msp(packet)
+
+    #
     # Field Tests
     #
 
